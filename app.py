@@ -8,7 +8,13 @@ import os
 app = Flask(__name__)
 
 # Use built-in login for AGOL (replace with credentials if needed)
-gis = GIS("home")
+
+# Securely access credentials
+AGOL_USERNAME = os.environ.get("AGOL_USERNAME")
+AGOL_PASSWORD = os.environ.get("AGOL_PASSWORD")
+
+gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
+
 
 # Your AGOL Feature Layer URLs
 POLYGON_LAYER_URL = "https://services-eu1.arcgis.com/RD4JRHAllAtE3ymT/arcgis/rest/services/Secto_VM_Design_WFL1/FeatureServer/9"
