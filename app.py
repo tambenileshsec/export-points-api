@@ -31,7 +31,7 @@ def export_points():
         return "Error: 'polygon_id' parameter is required", 400
 
     # Query the selected polygon
-    polygon_result = polygon_layer.query(where=f"OBJECTID = {polygon_id}", return_geometry=True)
+    polygon_result = polygon_layer.query(where=f"FID = {polygon_id}", return_geometry=True)
     if not polygon_result.features:
         return "Polygon not found", 404
 
