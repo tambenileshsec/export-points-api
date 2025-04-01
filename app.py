@@ -58,11 +58,15 @@ def export_points():
 
         df = pd.DataFrame([f.attributes for f in features])
 
+        # Generate filename from kmduid
+        kmduid = df.iloc[0].get("kmduid", "Address")
+        filename = f"{kmduid}_Address.xlsx"
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             df.to_excel(tmp.name, index=False)
 
-        # Immediately redirect user to download route
-        return redirect(url_for("download_file", filename=os.path.basename(tmp.name)))
+        # Store filename to use during download
+        return redirect(url_for("download_file", filename=os.path.basename(tmp.name), download_name=filename))
 
     except Exception as e:
         return f"An error occurred: {e}", 500
@@ -70,7 +74,8 @@ def export_points():
 @app.route("/download/<filename>")
 def download_file(filename):
     filepath = os.path.join(tempfile.gettempdir(), filename)
-    return send_file(filepath, as_attachment=True, download_name="Address.xlsx")
+    download_name = request.args.get("download_name", "Address.xlsx")
+    return send_file(filepath, as_attachment=True, download_name=download_name)
 
 if __name__ == "__main__":
     app.run(debug=True)
