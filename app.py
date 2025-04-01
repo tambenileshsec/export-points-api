@@ -1,71 +1,76 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, Response, render_template_string
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayer
 import pandas as pd
-import tempfile
-import os
+import io
 
 app = Flask(__name__)
 
-USERNAME = "Design_Test"
-PASSWORD = "Secto@123"
-gis = GIS("https://www.arcgis.com", USERNAME, PASSWORD)
-
-POLYGON_LAYER_URL = "https://services-eu1.arcgis.com/RD4JRHAllAtE3ymT/arcgis/rest/services/MDU_Masterplan_VM/FeatureServer/0"
+POLYGON_LAYER_URL = "https://services-eu1.arcgis.com/RD4JRHAllAtE3ymT/arcgis/rest/services/Secto_VM_Design_WFL1/FeatureServer/9"
 POINT_LAYER_URL = "https://services-eu1.arcgis.com/RD4JRHAllAtE3ymT/arcgis/rest/services/Subunit_VM_Dataset/FeatureServer/0"
 
-polygon_layer = FeatureLayer(POLYGON_LAYER_URL)
-point_layer = FeatureLayer(POINT_LAYER_URL)
+USERNAME = "your_username"
+PASSWORD = "your_password"
 
-@app.route('/export_points')
+gis = GIS("https://www.arcgis.com", USERNAME, PASSWORD)
+
+@app.route("/export_points")
 def export_points():
     polygon_id = request.args.get("polygon_id")
     if not polygon_id:
-        return "Error: polygon_id is required", 400
+        return "Polygon ID is missing", 400
 
-    try:
-        # Get the selected polygon's geometry
-        poly_result = polygon_layer.query(where=f"FID = {polygon_id}", return_geometry=True)
-        if not poly_result.features:
-            return f"No polygon found with FID={polygon_id}", 404
+    # HTML page that triggers download
+    download_page = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Exporting...</title>
+        <script>
+            setTimeout(function() {{
+                window.location.href = "/download_excel?polygon_id={polygon_id}";
+            }}, 1000);
+            setTimeout(function() {{
+                window.close();
+            }}, 6000);
+        </script>
+    </head>
+    <body>
+        <h3>📥 Preparing your Excel export...</h3>
+        <p>Your download will begin shortly.</p>
+        <p>This window will close automatically.</p>
+    </body>
+    </html>
+    """
+    return render_template_string(download_page)
 
-        polygon_geom = poly_result.features[0].geometry
+@app.route("/download_excel")
+def download_excel():
+    polygon_id = request.args.get("polygon_id")
 
-        # Calculate bounding box (envelope)
-        x_coords = [pt[0] for ring in polygon_geom['rings'] for pt in ring]
-        y_coords = [pt[1] for ring in polygon_geom['rings'] for pt in ring]
+    poly_layer = FeatureLayer(POLYGON_LAYER_URL, gis=gis)
+    poly_result = poly_layer.query(where=f"OBJECTID = {polygon_id}", return_geometry=True)
 
-        envelope = {
-            "xmin": min(x_coords),
-            "ymin": min(y_coords),
-            "xmax": max(x_coords),
-            "ymax": max(y_coords),
-            "spatialReference": polygon_geom["spatialReference"]
-        }
+    if not poly_result.features:
+        return "Polygon not found", 404
 
-        print("Using envelope:", envelope)
+    geom = poly_result.features[0].geometry
 
-        # Query points within bounding box
-        points_result = point_layer.query(
-            geometry=envelope,
-            geometry_type="esriGeometryEnvelope",
-            spatial_rel="esriSpatialRelIntersects",
-            return_geometry=False,
-            out_fields="*"
-        )
+    point_layer = FeatureLayer(POINT_LAYER_URL, gis=gis)
+    points_result = point_layer.query(geometry=geom, spatial_relationship="esriSpatialRelIntersects", return_all_records=True)
 
-        features = points_result.features
-        if not features:
-            return "No points found within the polygon extent."
+    records = [f.attributes for f in points_result.features]
+    df = pd.DataFrame(records)
 
-        df = pd.DataFrame([f.attributes for f in features])
+    output = io.BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-            df.to_excel(tmp.name, index=False)
-            return send_file(tmp.name, as_attachment=True, download_name="Address.xlsx")
-
-    except Exception as e:
-        return f"An error occurred: {e}", 500
+    return Response(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=exported_points.xlsx"}
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
