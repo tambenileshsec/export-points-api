@@ -9,8 +9,8 @@ app = Flask(__name__)
 POLYGON_LAYER_URL = "https://services-eu1.arcgis.com/RD4JRHAllAtE3ymT/arcgis/rest/services/Secto_VM_Design_WFL1/FeatureServer/9"
 POINT_LAYER_URL = "https://services-eu1.arcgis.com/RD4JRHAllAtE3ymT/arcgis/rest/services/Subunit_VM_Dataset/FeatureServer/0"
 
-USERNAME = "your_username"
-PASSWORD = "your_password"
+USERNAME = "Design_Test"
+PASSWORD = "Secto@123"
 
 gis = GIS("https://www.arcgis.com", USERNAME, PASSWORD)
 
