@@ -24,12 +24,17 @@ def export_points():
         return "Error: polygon_id is required", 400
 
     try:
-        # Get polygon geometry
-        poly_result = polygon_layer.query(where=f"FID = {polygon_id}", return_geometry=True)
+        # Get polygon geometry and attributes
+        poly_result = polygon_layer.query(where=f"FID = {polygon_id}", return_geometry=True, out_fields='*')
         if not poly_result.features:
             return f"No polygon found with FID={polygon_id}", 404
 
-        polygon_geom = poly_result.features[0].geometry
+        polygon_feature = poly_result.features[0]
+        polygon_geom = polygon_feature.geometry
+        polygon_attrs = polygon_feature.attributes
+
+        # Get kmduid from polygon attributes
+        kmduid = polygon_attrs.get("kmduid", "Unknown")
 
         # Create bounding box manually (for envelope geometry type)
         x_coords = [pt[0] for ring in polygon_geom['rings'] for pt in ring]
@@ -58,8 +63,7 @@ def export_points():
 
         df = pd.DataFrame([f.attributes for f in features])
 
-        # Generate filename from kmduid
-        kmduid = df.iloc[0].get("kmduid", "Unknown")
+        # Generate filename from polygon kmduid
         filename = f"{kmduid}_Address.xlsx"
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
